@@ -81,14 +81,16 @@
 
   <script>
     (function() {
+      // We still conceptually separate topics (news, fashion, etc.)
+      // but now we only use them as seeds for random images.
       const topics = [
-        'breaking+news','fashion','advertising','architecture','sports',
+        'breaking-news','fashion','advertising','architecture','sports',
         'politics','finance','war','police','immigration'
       ];
 
       const camoTopics = [
-        'camouflage+pattern','military+camouflage','forest+camouflage',
-        'desert+camouflage','urban+camouflage','naval+camouflage'
+        'camouflage-01','camouflage-02','camouflage-03',
+        'camouflage-04','camouflage-05','camouflage-06'
       ];
 
       const rotationsDeg = [0, 15, 45, 90, 180];
@@ -106,18 +108,22 @@
           return arr[Math.floor(Math.random() * arr.length)];
         }
 
+        // Picsum: https://picsum.photos/
+        // We use the "seed" parameter to bias images per topic.
+        function buildUrl(seed) {
+          // 900x900 square, seeded by topic + random salt so it's not static
+          const salt = Math.floor(Math.random() * 1e9);
+          return 'https://picsum.photos/seed/' + encodeURIComponent(seed + '-' + salt) + '/900/900';
+        }
+
         function loadImage(url) {
           return new Promise((resolve, reject) => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => resolve(img);
-            img.onerror = reject;
+            img.onerror = (e) => reject(e);
             img.src = url;
           });
-        }
-
-        function buildUrl(q) {
-          return 'https://source.unsplash.com/random/900x900?' + q;
         }
 
         async function fetchImages() {
@@ -131,10 +137,10 @@
             Promise.allSettled(camoPromises)
           ]);
 
-          return {
-            main: mainSet.filter(r => r.status === 'fulfilled').map(r => r.value),
-            camo: camoSet.filter(r => r.status === 'fulfilled').map(r => r.value)
-          };
+          const main = mainSet.filter(r => r.status === 'fulfilled').map(r => r.value);
+          const camo = camoSet.filter(r => r.status === 'fulfilled').map(r => r.value);
+
+          return { main, camo };
         }
 
         function draw(mainImages, camoImages) {
@@ -148,7 +154,7 @@
           if (!mainImages.length) {
             ctx.fillStyle = '#fff';
             ctx.font = '16px system-ui, sans-serif';
-            ctx.fillText('No images loaded.', 20, 40);
+            ctx.fillText('No images loaded (network blocked?)', 20, 40);
             return;
           }
 
@@ -229,7 +235,10 @@
             statusEl.textContent = 'Collage ready';
           } catch (e) {
             console.error(e);
-            statusEl.textContent = 'Error loading images.';
+            statusEl.textContent = 'Error loading images (see console).';
+            ctx.fillStyle = '#fff';
+            ctx.font = '14px system-ui, sans-serif';
+            ctx.fillText('Error loading images.', 20, 40);
           }
         }
 
