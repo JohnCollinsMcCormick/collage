@@ -81,15 +81,30 @@
 
   <script>
     (function() {
-      // Conceptual topics (news, fashion, etc.) – used as seeds for random images
+      // Topical queries – closer to your original categories
       const topics = [
-        'breaking-news','fashion','advertising','architecture','sports',
-        'politics','finance','war','police','immigration'
+        'breaking news',
+        'fashion runway',
+        'advertising billboard',
+        'contemporary architecture',
+        'professional sports',
+        'political rally',
+        'stock market trading floor',
+        'war conflict',
+        'police officers',
+        'ICE immigration enforcement',
+        'border crossing immigration'
       ];
 
-      const camoSeeds = [
-        'camo-forest','camo-desert','camo-urban',
-        'camo-digital','camo-naval','camo-snow'
+      // Camo overlays – approximate “every nation / era” with different environments
+      const camoTopics = [
+        'military camouflage pattern',
+        'forest military camouflage',
+        'desert military camouflage',
+        'urban digital camouflage',
+        'naval ship camouflage',
+        'snow arctic camouflage',
+        'jungle camouflage uniform'
       ];
 
       const rotationsDeg = [0, 15, 45, 90, 180];
@@ -107,10 +122,10 @@
           return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        // Picsum random images with seeded URLs
-        function buildUrl(seed) {
-          const salt = Math.floor(Math.random() * 1e9);
-          return 'https://picsum.photos/seed/' + encodeURIComponent(seed + '-' + salt) + '/900/900';
+        // Unsplash random by topic – no API key required
+        function buildUnsplashUrl(query) {
+          // using 900x900, topic-specific search query
+          return 'https://source.unsplash.com/900x900/?' + encodeURIComponent(query);
         }
 
         function loadImage(url) {
@@ -119,16 +134,16 @@
             img.onload = () => resolve(img);
             img.onerror = () => {
               console.warn('Image failed:', url);
-              resolve(null); // resolve as null so we can still continue
+              resolve(null); // resolve null so we can still proceed
             };
             img.src = url;
           });
         }
 
         async function fetchImages() {
-          const mainPromises = topics.map(t => loadImage(buildUrl(t)));
-          const camoPromises = Array.from({ length: 4 }, () =>
-            loadImage(buildUrl(randomItem(camoSeeds)))
+          const mainPromises = topics.map(t => loadImage(buildUnsplashUrl(t)));
+          const camoPromises = Array.from({ length: 5 }, () =>
+            loadImage(buildUnsplashUrl(randomItem(camoTopics)))
           );
 
           const mainSet = await Promise.all(mainPromises);
@@ -141,7 +156,7 @@
         }
 
         function drawFallbackAbstract() {
-          // Draw something clearly visible if no external images load
+          // Draw *something* visible if all external images fail
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
@@ -155,9 +170,9 @@
             const h = 80 + Math.random() * 260;
             const angle = randomItem(rotationsDeg) * Math.PI / 180;
 
-            const r = 100 + Math.floor(Math.random() * 155);
-            const g = 100 + Math.floor(Math.random() * 155);
-            const b = 100 + Math.floor(Math.random() * 155);
+            const r = 80 + Math.floor(Math.random() * 175);
+            const g = 80 + Math.floor(Math.random() * 175);
+            const b = 80 + Math.floor(Math.random() * 175);
 
             ctx.save();
             ctx.translate(x, y);
@@ -181,15 +196,15 @@
           ctx.fillRect(0, 0, W, H);
 
           if (!mainImages.length) {
-            // No images loaded – draw bright abstract collage so it's never just black
             drawFallbackAbstract();
             return;
           }
 
-          const numTiles = Math.max(15, Math.floor(mainImages.length * 1.8));
+          const numTiles = Math.max(18, Math.floor(mainImages.length * 2));
 
           for (let i = 0; i < numTiles; i++) {
             const img = randomItem(mainImages);
+            if (!img) continue;
 
             const scale = 0.25 + Math.random() * 0.55;
             const tileW = W * scale;
@@ -209,12 +224,13 @@
             ctx.rotate(angle);
 
             ctx.filter = `invert(${invert}) contrast(${contrast}) brightness(${brightness})`;
-            ctx.globalAlpha = 0.75 + Math.random() * 0.25;
+            ctx.globalAlpha = 0.7 + Math.random() * 0.3;
 
             ctx.drawImage(img, -tileW / 2, -tileH / 2, tileW, tileH);
             ctx.restore();
           }
 
+          // Camo overlay mask
           if (camoImages.length) {
             ctx.save();
             ctx.globalCompositeOperation = randomItem([
@@ -222,11 +238,12 @@
             ]);
             ctx.globalAlpha = 0.75;
 
-            const tileSize = 450;
+            const tileSize = 420;
 
             for (let cx = 0; cx < W + tileSize; cx += tileSize * 0.8) {
               for (let cy = 0; cy < H + tileSize; cy += tileSize * 0.8) {
                 const camo = randomItem(camoImages);
+                if (!camo) continue;
 
                 ctx.save();
                 ctx.translate(cx + tileSize / 2, cy + tileSize / 2);
@@ -244,6 +261,7 @@
             ctx.restore();
           }
 
+          // Vignette
           const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 700);
           g.addColorStop(0, 'rgba(0, 0, 0, 0)');
           g.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
