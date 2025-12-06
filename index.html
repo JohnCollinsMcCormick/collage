@@ -81,16 +81,15 @@
 
   <script>
     (function() {
-      // We still conceptually separate topics (news, fashion, etc.)
-      // but now we only use them as seeds for random images.
+      // Conceptual topics (news, fashion, etc.) – used as seeds for random images
       const topics = [
         'breaking-news','fashion','advertising','architecture','sports',
         'politics','finance','war','police','immigration'
       ];
 
-      const camoTopics = [
-        'camouflage-01','camouflage-02','camouflage-03',
-        'camouflage-04','camouflage-05','camouflage-06'
+      const camoSeeds = [
+        'camo-forest','camo-desert','camo-urban',
+        'camo-digital','camo-naval','camo-snow'
       ];
 
       const rotationsDeg = [0, 15, 45, 90, 180];
@@ -108,20 +107,20 @@
           return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        // Picsum: https://picsum.photos/
-        // We use the "seed" parameter to bias images per topic.
+        // Picsum random images with seeded URLs
         function buildUrl(seed) {
-          // 900x900 square, seeded by topic + random salt so it's not static
           const salt = Math.floor(Math.random() * 1e9);
           return 'https://picsum.photos/seed/' + encodeURIComponent(seed + '-' + salt) + '/900/900';
         }
 
         function loadImage(url) {
-          return new Promise((resolve, reject) => {
+          return new Promise((resolve) => {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
             img.onload = () => resolve(img);
-            img.onerror = (e) => reject(e);
+            img.onerror = () => {
+              console.warn('Image failed:', url);
+              resolve(null); // resolve as null so we can still continue
+            };
             img.src = url;
           });
         }
@@ -129,18 +128,48 @@
         async function fetchImages() {
           const mainPromises = topics.map(t => loadImage(buildUrl(t)));
           const camoPromises = Array.from({ length: 4 }, () =>
-            loadImage(buildUrl(randomItem(camoTopics)))
+            loadImage(buildUrl(randomItem(camoSeeds)))
           );
 
-          const [mainSet, camoSet] = await Promise.all([
-            Promise.allSettled(mainPromises),
-            Promise.allSettled(camoPromises)
-          ]);
+          const mainSet = await Promise.all(mainPromises);
+          const camoSet = await Promise.all(camoPromises);
 
-          const main = mainSet.filter(r => r.status === 'fulfilled').map(r => r.value);
-          const camo = camoSet.filter(r => r.status === 'fulfilled').map(r => r.value);
+          const main = mainSet.filter(Boolean);
+          const camo = camoSet.filter(Boolean);
 
           return { main, camo };
+        }
+
+        function drawFallbackAbstract() {
+          // Draw something clearly visible if no external images load
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, W, H);
+
+          for (let i = 0; i < 40; i++) {
+            const x = Math.random() * W;
+            const y = Math.random() * H;
+            const w = 80 + Math.random() * 260;
+            const h = 80 + Math.random() * 260;
+            const angle = randomItem(rotationsDeg) * Math.PI / 180;
+
+            const r = 100 + Math.floor(Math.random() * 155);
+            const g = 100 + Math.floor(Math.random() * 155);
+            const b = 100 + Math.floor(Math.random() * 155);
+
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = `rgba(${r},${g},${b},${0.6 + Math.random()*0.4})`;
+            ctx.fillRect(-w/2, -h/2, w, h);
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '14px system-ui, sans-serif';
+          ctx.fillText('Fallback abstract collage (no external images)', 20, H - 20);
         }
 
         function draw(mainImages, camoImages) {
@@ -152,13 +181,12 @@
           ctx.fillRect(0, 0, W, H);
 
           if (!mainImages.length) {
-            ctx.fillStyle = '#fff';
-            ctx.font = '16px system-ui, sans-serif';
-            ctx.fillText('No images loaded (network blocked?)', 20, 40);
+            // No images loaded – draw bright abstract collage so it's never just black
+            drawFallbackAbstract();
             return;
           }
 
-          const numTiles = mainImages.length * 1.8;
+          const numTiles = Math.max(15, Math.floor(mainImages.length * 1.8));
 
           for (let i = 0; i < numTiles; i++) {
             const img = randomItem(mainImages);
@@ -232,13 +260,13 @@
           try {
             const { main, camo } = await fetchImages();
             draw(main, camo);
-            statusEl.textContent = 'Collage ready';
+            statusEl.textContent = main.length
+              ? 'Collage ready'
+              : 'Fallback collage (no external images)';
           } catch (e) {
             console.error(e);
-            statusEl.textContent = 'Error loading images (see console).';
-            ctx.fillStyle = '#fff';
-            ctx.font = '14px system-ui, sans-serif';
-            ctx.fillText('Error loading images.', 20, 40);
+            statusEl.textContent = 'Error loading images.';
+            drawFallbackAbstract();
           }
         }
 
