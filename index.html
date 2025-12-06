@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Camo News Collage</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    #news-camo-wrapper {
+      position: relative;
+      width: 1027px;
+      height: 1027px;
+      margin: 24px;
+      background: #000;
+      overflow: hidden;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.6);
+    }
+
+    #news-camo-controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 8px 12px;
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      font-size: 11px;
+    }
+
+    #news-camo-controls button {
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: #eee;
+      color: #111;
+    }
+
+    #news-camo-controls button:hover {
+      opacity: 0.85;
+    }
+
+    #news-camo-status {
+      opacity: 0.8;
+    }
+
+    #news-camo-collage {
+      display: block;
+      width: 1027px;
+      height: 1027px;
+    }
+  </style>
+</head>
+<body>
+  <div id="news-camo-wrapper">
+    <div id="news-camo-controls">
+      <button id="news-camo-regenerate">Regenerate</button>
+      <span id="news-camo-status">Loading collage…</span>
+    </div>
+    <canvas id="news-camo-collage" width="1027" height="1027"></canvas>
+  </div>
+
+  <script>
+    (function() {
+      const topics = [
+        'breaking+news','fashion','advertising','architecture','sports',
+        'politics','finance','war','police','immigration'
+      ];
+
+      const camoTopics = [
+        'camouflage+pattern','military+camouflage','forest+camouflage',
+        'desert+camouflage','urban+camouflage','naval+camouflage'
+      ];
+
+      const rotationsDeg = [0, 15, 45, 90, 180];
+
+      function initNewsCamoCollage() {
+        const canvas = document.getElementById('news-camo-collage');
+        const statusEl = document.getElementById('news-camo-status');
+        const regenerateBtn = document.getElementById('news-camo-regenerate');
+        const ctx = canvas.getContext('2d');
+
+        const W = canvas.width = 1027;
+        const H = canvas.height = 1027;
+
+        function randomItem(arr) {
+          return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function loadImage(url) {
+          return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = url;
+          });
+        }
+
+        function buildUrl(q) {
+          return 'https://source.unsplash.com/random/900x900?' + q;
+        }
+
+        async function fetchImages() {
+          const mainPromises = topics.map(t => loadImage(buildUrl(t)));
+          const camoPromises = Array.from({ length: 4 }, () =>
+            loadImage(buildUrl(randomItem(camoTopics)))
+          );
+
+          const [mainSet, camoSet] = await Promise.all([
+            Promise.allSettled(mainPromises),
+            Promise.allSettled(camoPromises)
+          ]);
+
+          return {
+            main: mainSet.filter(r => r.status === 'fulfilled').map(r => r.value),
+            camo: camoSet.filter(r => r.status === 'fulfilled').map(r => r.value)
+          };
+        }
+
+        function draw(mainImages, camoImages) {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
+          ctx.filter = 'none';
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, W, H);
+
+          if (!mainImages.length) {
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px system-ui, sans-serif';
+            ctx.fillText('No images loaded.', 20, 40);
+            return;
+          }
+
+          const numTiles = mainImages.length * 1.8;
+
+          for (let i = 0; i < numTiles; i++) {
+            const img = randomItem(mainImages);
+
+            const scale = 0.25 + Math.random() * 0.55;
+            const tileW = W * scale;
+            const tileH = H * (0.3 + Math.random() * 0.4);
+
+            const x = Math.random() * (W - tileW);
+            const y = Math.random() * (H - tileH);
+
+            const angle = randomItem(rotationsDeg) * Math.PI / 180;
+
+            const invert = Math.random() < 0.6 ? 1 : 0;
+            const contrast = 1 + Math.random() * 0.8;
+            const brightness = 0.8 + Math.random() * 0.6;
+
+            ctx.save();
+            ctx.translate(x + tileW / 2, y + tileH / 2);
+            ctx.rotate(angle);
+
+            ctx.filter = `invert(${invert}) contrast(${contrast}) brightness(${brightness})`;
+            ctx.globalAlpha = 0.75 + Math.random() * 0.25;
+
+            ctx.drawImage(img, -tileW / 2, -tileH / 2, tileW, tileH);
+            ctx.restore();
+          }
+
+          if (camoImages.length) {
+            ctx.save();
+            ctx.globalCompositeOperation = randomItem([
+              'multiply', 'overlay', 'soft-light', 'darken', 'hard-light'
+            ]);
+            ctx.globalAlpha = 0.75;
+
+            const tileSize = 450;
+
+            for (let cx = 0; cx < W + tileSize; cx += tileSize * 0.8) {
+              for (let cy = 0; cy < H + tileSize; cy += tileSize * 0.8) {
+                const camo = randomItem(camoImages);
+
+                ctx.save();
+                ctx.translate(cx + tileSize / 2, cy + tileSize / 2);
+                ctx.rotate(randomItem(rotationsDeg) * Math.PI / 180);
+
+                const s = 0.8 + Math.random() * 0.6;
+                const w = tileSize * s;
+                const h = tileSize * s;
+
+                ctx.drawImage(camo, -w / 2, -h / 2, w, h);
+                ctx.restore();
+              }
+            }
+
+            ctx.restore();
+          }
+
+          const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 700);
+          g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          g.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, W, H);
+          ctx.restore();
+        }
+
+        async function generate() {
+          statusEl.textContent = 'Loading collage…';
+          try {
+            const { main, camo } = await fetchImages();
+            draw(main, camo);
+            statusEl.textContent = 'Collage ready';
+          } catch (e) {
+            console.error(e);
+            statusEl.textContent = 'Error loading images.';
+          }
+        }
+
+        regenerateBtn.addEventListener('click', generate);
+        generate();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initNewsCamoCollage);
+      } else {
+        initNewsCamoCollage();
+      }
+    })();
+  </script>
+</body>
+</html>
