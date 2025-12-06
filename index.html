@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Camo Mask News Collage</title>
+  <title>Camo Mask News Collage (Local Images)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html, body {
@@ -81,30 +81,30 @@
 
   <script>
     (function() {
-      // Topical queries feeding the "behind" collage
-      const topics = [
-        'breaking news',
-        'fashion runway',
-        'advertising billboard',
-        'contemporary architecture',
-        'professional sports',
-        'political rally',
-        'stock market trading floor',
-        'war conflict',
-        'police officers',
-        'ICE immigration enforcement',
-        'border crossing immigration'
+      // === 1. DEFINE YOUR LOCAL IMAGE SETS HERE ===========================
+      // These paths are relative to index.html in your repo.
+      // Make sure the filenames match what you upload into /images/main and /images/camo.
+
+      const mainImagePaths = [
+        // news / fashion / architecture / sports / politics / war / police / ICE / immigration etc.
+        'images/main/news1.jpg',
+        'images/main/news2.jpg',
+        'images/main/war1.jpg',
+        'images/main/police1.jpg',
+        'images/main/immigration1.jpg',
+        'images/main/finance1.jpg',
+        'images/main/protest1.jpg',
+        'images/main/fashion1.jpg',
+        'images/main/architecture1.jpg'
+        // add more as you upload: 'images/main/filename.jpg',
       ];
 
-      // Camo sources for the mask itself
-      const camoTopics = [
-        'military camouflage pattern',
-        'forest military camouflage',
-        'desert military camouflage',
-        'urban digital camouflage',
-        'naval ship camouflage',
-        'snow arctic camouflage',
-        'jungle camouflage uniform'
+      const camoImagePaths = [
+        'images/camo/camo1.jpg',
+        'images/camo/camo2.jpg',
+        'images/camo/camo3.jpg',
+        'images/camo/camo4.jpg'
+        // add more: 'images/camo/another-camo.jpg',
       ];
 
       const rotationsDeg = [0, 15, 45, 90, 180];
@@ -122,28 +122,21 @@
           return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        // Unsplash topical imagery
-        function buildUnsplashUrl(query) {
-          return 'https://source.unsplash.com/900x900/?' + encodeURIComponent(query);
-        }
-
         function loadImage(url) {
           return new Promise((resolve) => {
             const img = new Image();
             img.onload = () => resolve(img);
             img.onerror = () => {
-              console.warn('Image failed:', url);
+              console.warn('Failed to load image:', url);
               resolve(null);
             };
-            img.src = url;
+            img.src = url + '?v=' + Date.now(); // cache-buster when you replace files
           });
         }
 
-        async function fetchImages() {
-          const mainPromises = topics.map(t => loadImage(buildUnsplashUrl(t)));
-          const camoPromises = Array.from({ length: 6 }, () =>
-            loadImage(buildUnsplashUrl(randomItem(camoTopics)))
-          );
+        async function fetchLocalImages() {
+          const mainPromises = mainImagePaths.map(p => loadImage(p));
+          const camoPromises = camoImagePaths.map(p => loadImage(p));
 
           const mainSet = await Promise.all(mainPromises);
           const camoSet = await Promise.all(camoPromises);
@@ -155,7 +148,6 @@
         }
 
         function drawFallbackAbstract() {
-          // Behind content if no external images load
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
@@ -179,6 +171,10 @@
             ctx.fillRect(-w/2, -h/2, w, h);
             ctx.restore();
           }
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '14px system-ui, sans-serif';
+          ctx.fillText('Fallback abstract collage (no local images yet)', 20, H - 20);
         }
 
         function drawBehindCollage(mainImages) {
@@ -206,7 +202,6 @@
             const y = Math.random() * (H - tileH);
 
             const angle = randomItem(rotationsDeg) * Math.PI / 180;
-
             const invert = Math.random() < 0.6 ? 1 : 0;
             const contrast = 1 + Math.random() * 0.8;
             const brightness = 0.8 + Math.random() * 0.6;
@@ -222,7 +217,6 @@
             ctx.restore();
           }
 
-          // Reset filter/alpha
           ctx.filter = 'none';
           ctx.globalAlpha = 1;
         }
@@ -243,21 +237,16 @@
               const w = tileSize * s;
               const h = tileSize * s;
 
-              // You can tweak alpha here to thin/thicken the mask
               ctx.globalAlpha = 1;
-              ctx.drawImage(camo, -w / 2, -h / 2, w, h);
-
+              ctx.drawImage(camo, -w/2, -h/2, w, h);
               ctx.restore();
             }
           }
         }
 
         function applyCamoMask(camoImages) {
-          if (!camoImages.length) {
-            return; // no camo, no mask – behind collage fills full frame
-          }
+          if (!camoImages.length) return; // no mask, full collage visible
 
-          // Use destination-in: keeps only pixels where the camo is drawn
           ctx.save();
           ctx.globalCompositeOperation = 'destination-in';
           drawCamoMaskPattern(camoImages);
@@ -281,25 +270,25 @@
         }
 
         async function generate() {
-          statusEl.textContent = 'Loading collage…';
+          statusEl.textContent = 'Loading local images…';
           try {
-            const { main, camo } = await fetchImages();
+            const { main, camo } = await fetchLocalImages();
 
-            // 1. Draw the behind collage (news/fashion/war/etc.)
             drawBehindCollage(main);
-
-            // 2. Apply the camo as a MASK (regenerates each time)
             applyCamoMask(camo);
-
-            // 3. Vignette on top
             applyVignette();
 
-            statusEl.textContent = main.length
-              ? (camo.length ? 'Collage + camo mask ready' : 'Collage ready (no camo images)')
-              : 'Fallback collage (no external images)';
+            if (!main.length) {
+              statusEl.textContent = 'Fallback collage (add images to /images/main)';
+            } else if (!camo.length) {
+              statusEl.textContent = 'Collage ready (add camo to /images/camo for mask)';
+            } else {
+              statusEl.textContent = 'Collage + camo mask ready (local images)';
+            }
+
           } catch (e) {
             console.error(e);
-            statusEl.textContent = 'Error loading images.';
+            statusEl.textContent = 'Error loading local images.';
             drawFallbackAbstract();
           }
         }
