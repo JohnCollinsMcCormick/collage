@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Camo News Collage</title>
+  <title>Camo Mask News Collage</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     html, body {
@@ -81,7 +81,7 @@
 
   <script>
     (function() {
-      // Topical queries – closer to your original categories
+      // Topical queries feeding the "behind" collage
       const topics = [
         'breaking news',
         'fashion runway',
@@ -96,7 +96,7 @@
         'border crossing immigration'
       ];
 
-      // Camo overlays – approximate “every nation / era” with different environments
+      // Camo sources for the mask itself
       const camoTopics = [
         'military camouflage pattern',
         'forest military camouflage',
@@ -122,9 +122,8 @@
           return arr[Math.floor(Math.random() * arr.length)];
         }
 
-        // Unsplash random by topic – no API key required
+        // Unsplash topical imagery
         function buildUnsplashUrl(query) {
-          // using 900x900, topic-specific search query
           return 'https://source.unsplash.com/900x900/?' + encodeURIComponent(query);
         }
 
@@ -134,7 +133,7 @@
             img.onload = () => resolve(img);
             img.onerror = () => {
               console.warn('Image failed:', url);
-              resolve(null); // resolve null so we can still proceed
+              resolve(null);
             };
             img.src = url;
           });
@@ -142,26 +141,25 @@
 
         async function fetchImages() {
           const mainPromises = topics.map(t => loadImage(buildUnsplashUrl(t)));
-          const camoPromises = Array.from({ length: 5 }, () =>
+          const camoPromises = Array.from({ length: 6 }, () =>
             loadImage(buildUnsplashUrl(randomItem(camoTopics)))
           );
 
           const mainSet = await Promise.all(mainPromises);
           const camoSet = await Promise.all(camoPromises);
 
-          const main = mainSet.filter(Boolean);
-          const camo = camoSet.filter(Boolean);
-
-          return { main, camo };
+          return {
+            main: mainSet.filter(Boolean),
+            camo: camoSet.filter(Boolean)
+          };
         }
 
         function drawFallbackAbstract() {
-          // Draw *something* visible if all external images fail
+          // Behind content if no external images load
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, W, H);
+          ctx.clearRect(0, 0, W, H);
 
           for (let i = 0; i < 40; i++) {
             const x = Math.random() * W;
@@ -181,19 +179,13 @@
             ctx.fillRect(-w/2, -h/2, w, h);
             ctx.restore();
           }
-
-          ctx.fillStyle = '#fff';
-          ctx.font = '14px system-ui, sans-serif';
-          ctx.fillText('Fallback abstract collage (no external images)', 20, H - 20);
         }
 
-        function draw(mainImages, camoImages) {
+        function drawBehindCollage(mainImages) {
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.globalCompositeOperation = 'source-over';
           ctx.globalAlpha = 1;
-          ctx.filter = 'none';
-          ctx.fillStyle = '#000';
-          ctx.fillRect(0, 0, W, H);
+          ctx.clearRect(0, 0, W, H);
 
           if (!mainImages.length) {
             drawFallbackAbstract();
@@ -230,44 +222,59 @@
             ctx.restore();
           }
 
-          // Camo overlay mask
-          if (camoImages.length) {
-            ctx.save();
-            ctx.globalCompositeOperation = randomItem([
-              'multiply', 'overlay', 'soft-light', 'darken', 'hard-light'
-            ]);
-            ctx.globalAlpha = 0.75;
+          // Reset filter/alpha
+          ctx.filter = 'none';
+          ctx.globalAlpha = 1;
+        }
 
-            const tileSize = 420;
+        function drawCamoMaskPattern(camoImages) {
+          const tileSize = 420;
 
-            for (let cx = 0; cx < W + tileSize; cx += tileSize * 0.8) {
-              for (let cy = 0; cy < H + tileSize; cy += tileSize * 0.8) {
-                const camo = randomItem(camoImages);
-                if (!camo) continue;
+          for (let cx = 0; cx < W + tileSize; cx += tileSize * 0.8) {
+            for (let cy = 0; cy < H + tileSize; cy += tileSize * 0.8) {
+              const camo = randomItem(camoImages);
+              if (!camo) continue;
 
-                ctx.save();
-                ctx.translate(cx + tileSize / 2, cy + tileSize / 2);
-                ctx.rotate(randomItem(rotationsDeg) * Math.PI / 180);
+              ctx.save();
+              ctx.translate(cx + tileSize / 2, cy + tileSize / 2);
+              ctx.rotate(randomItem(rotationsDeg) * Math.PI / 180);
 
-                const s = 0.8 + Math.random() * 0.6;
-                const w = tileSize * s;
-                const h = tileSize * s;
+              const s = 0.8 + Math.random() * 0.6;
+              const w = tileSize * s;
+              const h = tileSize * s;
 
-                ctx.drawImage(camo, -w / 2, -h / 2, w, h);
-                ctx.restore();
-              }
+              // You can tweak alpha here to thin/thicken the mask
+              ctx.globalAlpha = 1;
+              ctx.drawImage(camo, -w / 2, -h / 2, w, h);
+
+              ctx.restore();
             }
+          }
+        }
 
-            ctx.restore();
+        function applyCamoMask(camoImages) {
+          if (!camoImages.length) {
+            return; // no camo, no mask – behind collage fills full frame
           }
 
-          // Vignette
-          const g = ctx.createRadialGradient(W / 2, H / 2, 200, W / 2, H / 2, 700);
+          // Use destination-in: keeps only pixels where the camo is drawn
+          ctx.save();
+          ctx.globalCompositeOperation = 'destination-in';
+          drawCamoMaskPattern(camoImages);
+          ctx.restore();
+        }
+
+        function applyVignette() {
+          const g = ctx.createRadialGradient(
+            W / 2, H / 2, 200,
+            W / 2, H / 2, 700
+          );
           g.addColorStop(0, 'rgba(0, 0, 0, 0)');
           g.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
 
           ctx.save();
-          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.globalAlpha = 1;
           ctx.fillStyle = g;
           ctx.fillRect(0, 0, W, H);
           ctx.restore();
@@ -277,9 +284,18 @@
           statusEl.textContent = 'Loading collage…';
           try {
             const { main, camo } = await fetchImages();
-            draw(main, camo);
+
+            // 1. Draw the behind collage (news/fashion/war/etc.)
+            drawBehindCollage(main);
+
+            // 2. Apply the camo as a MASK (regenerates each time)
+            applyCamoMask(camo);
+
+            // 3. Vignette on top
+            applyVignette();
+
             statusEl.textContent = main.length
-              ? 'Collage ready'
+              ? (camo.length ? 'Collage + camo mask ready' : 'Collage ready (no camo images)')
               : 'Fallback collage (no external images)';
           } catch (e) {
             console.error(e);
